@@ -85,7 +85,7 @@ int getrdsdata (struct radio_data_t *rds) {
 		//LOGI("SI47XX_IOC_RDS_DATA_GET\n");
 		return SILAB_TRUE;
     } 
-    LOGI("GET RDS DATA ERROR\n");
+    //LOGI("GET RDS DATA ERROR\n");
 	return SILAB_FALSE;
 }
 

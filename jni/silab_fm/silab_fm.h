@@ -34,8 +34,10 @@
 #define DE_TIME_CONSTANT_50	    1	/*Europe,Japan,Australia */
 #define DE_TIME_CONSTANT_75	    0	/*US*/
 
-#define GROUP_TYPE_2A (2 * 2 + 0)
-#define GROUP_TYPE_2B (2 * 2 + 1)
+#define GROUP_TYPE_0A 0
+#define GROUP_TYPE_0B 1
+#define GROUP_TYPE_2A 4
+#define GROUP_TYPE_2B 5
 
 #define RDS_EVENT_PROGRAMNAME    0x0008
 #define RDS_EVENT_LAST_RADIOTEXT 0x0040

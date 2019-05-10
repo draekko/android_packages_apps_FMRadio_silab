@@ -38,10 +38,13 @@
 #define LOG_TAG "LIBFMSILAB_JNI"
 
 
-char TEXT_GROUP_2A[65];
-char LRT_GROUP_2A[65];
-bool wait2a = true;
-
+char TEXT_GROUP_2A2B[65];
+char LRT_GROUP[65];
+char TEXT_GROUP_0A0B[9];
+char PS_GROUP[9];
+bool wait2a2b = true;
+bool wait0a0b = true;
+short altfreq;
 struct radio_data_t rds;
 int scanning = 0;
 
@@ -55,11 +58,18 @@ jboolean openDev(JNIEnv *env, jobject thiz) {
     setFd(fd);
 
     for (int p = 0; p < 64; p++) {
-        TEXT_GROUP_2A[p] = 32;
-        LRT_GROUP_2A[p] = 32;
+        TEXT_GROUP_2A2B[p] = 32;
+        LRT_GROUP[p] = 32;
     }
-    TEXT_GROUP_2A[64] = 0;
-    LRT_GROUP_2A[64] = 0;
+    TEXT_GROUP_2A2B[64] = 0;
+    LRT_GROUP[64] = 0;
+
+    for (int p = 0; p < 9; p++) {
+        TEXT_GROUP_0A0B[p] = 32;
+        PS_GROUP[p] = 32;
+    }
+    TEXT_GROUP_0A0B[9] = 0;
+    PS_GROUP[9] = 0;
 
     return JNI_TRUE;
 }
@@ -174,7 +184,7 @@ jboolean tune(JNIEnv *env, jobject thiz, jfloat freq) {
 
     LOGI("%s, [freq=%d]\n", __func__, (int)freq);
 
-    wait2a = true;
+    wait2a2b = true;
 
 	if (setdsmuteon() != SILAB_TRUE) {
         status = JNI_FALSE;
@@ -223,7 +233,7 @@ jboolean tune(JNIEnv *env, jobject thiz, jfloat freq) {
 jfloat seek(JNIEnv *env, jobject thiz, jfloat freq, jboolean isUp) {
     u32 frq;
     LOGI("%s, [freq=%d][SCAN %s]\n", __func__, (int)freq, isUp?"UP":"DOWN");
-    wait2a = true;
+    wait2a2b = true;
     if (isUp == JNI_TRUE) {
 	    if (seekup(&frq) != SILAB_TRUE) {
             return 0;
@@ -287,8 +297,66 @@ jshort readRds(JNIEnv *env, jobject thiz) {
         int picode = rds.rdsa;
         int grpcode = rds.rdsb >> 11;
         bool clear = false;
-        if (grpcode == 0x1) {
-            picode = rds.rdsc;
+        bool setaf = false;
+        if (grpcode == GROUP_TYPE_0A) {
+            int pos = rds.rdsb & 0x3;
+            if (rds.rdsc >= 1 && rds.rdsc <= 204) {
+                altfreq = (short) ((87.6f + ((rds.rdsc - 1) * 0.1f)) * 100.0f);
+                setaf = true;
+            }
+		    u8 c1 = (u8)(rds.rdsd >> 8);
+		    u8 c2 = (u8)(rds.rdsd & 0xFF);
+            if (c1 < 32) c1 = 32;
+            if (c2 < 32) c2 = 32;
+            if (pos == 0) {
+                for (int p = 0; p < 10; p++) {
+                    PS_GROUP[p] = TEXT_GROUP_0A0B[p];
+                }
+                for (int p = 0; p < 10; p++) {
+                    TEXT_GROUP_0A0B[p] = 32;
+                }
+                TEXT_GROUP_0A0B[9] = 0;
+            }
+            TEXT_GROUP_0A0B[pos * 2 + 0] = (char)c1;
+            TEXT_GROUP_0A0B[pos * 2 + 1] = (char)c2;
+            if (pos == 0) {
+                if (wait0a0b == false) {
+                    jshort status = RDS_EVENT_PROGRAMNAME;
+                    if (setaf == true) {
+                        status |= RDS_EVENT_AF;
+                    }
+                    return status;
+                } else {
+                    wait0a0b = false;
+                }
+            }
+            LOGI("TEXT_GROUP_0A0B[%d][%s]\n", pos, TEXT_GROUP_0A0B);
+        } else if (grpcode == GROUP_TYPE_0B) {
+            int pos = rds.rdsb & 0x3;
+		    u8 c1 = (u8)(rds.rdsd >> 8);
+		    u8 c2 = (u8)(rds.rdsd & 0xFF);
+            if (c1 < 32) c1 = 32;
+            if (c2 < 32) c2 = 32;
+            if (pos == 0) {
+                for (int p = 0; p < 10; p++) {
+                    PS_GROUP[p] = TEXT_GROUP_0A0B[p];
+                }
+                for (int p = 0; p < 10; p++) {
+                    TEXT_GROUP_0A0B[p] = 32;
+                }
+                TEXT_GROUP_0A0B[9] = 0;
+            }
+
+            TEXT_GROUP_0A0B[pos * 2 + 0] = (char)c1;
+            TEXT_GROUP_0A0B[pos * 2 + 1] = (char)c2;
+            if (pos == 0) {
+                if (wait0a0b == false) {
+                    return RDS_EVENT_PROGRAMNAME;
+                } else {
+                    wait0a0b = false;
+                }
+            }        
+            LOGI("TEXT_GROUP_0A0B[%d][%s]\n", pos, TEXT_GROUP_0A0B);
         } else if (grpcode == GROUP_TYPE_2A || grpcode == GROUP_TYPE_2B) {
             if ((rds.rdsb & 0x10) == 0x10) {
                 clear = true;
@@ -301,40 +369,43 @@ jshort readRds(JNIEnv *env, jobject thiz) {
 		    u8 c2 = (u8)(rds.rdsc & 0xFF);
 		    u8 c3 = (u8)(rds.rdsd >> 8);
 		    u8 c4 = (u8)(rds.rdsd & 0xFF);
-            if (c1 < 32 || c1 > 126) c1 = 32;
-            if (c2 < 32 || c2 > 126) c2 = 32;
-            if (c3 < 32 || c3 > 126) c3 = 32;
-            if (c4 < 32 || c4 > 126) c4 = 32;
+            //if (c1 < 32 || c1 > 126) c1 = 32;
+            //if (c2 < 32 || c2 > 126) c2 = 32;
+            //if (c3 < 32 || c3 > 126) c3 = 32;
+            //if (c4 < 32 || c4 > 126) c4 = 32;
+            if (c1 < 32) c1 = 32;
+            if (c2 < 32) c2 = 32;
+            if (c3 < 32) c3 = 32;
+            if (c4 < 32) c4 = 32;
             if (pos == 0) {
                 for (int p = 0; p < 65; p++) {
-                    LRT_GROUP_2A[p] = TEXT_GROUP_2A[p];
+                    LRT_GROUP[p] = TEXT_GROUP_2A2B[p];
                 }
                 for (int p = 0; p < 64; p++) {
-                    TEXT_GROUP_2A[p] = 32;
+                    TEXT_GROUP_2A2B[p] = 32;
                 }
-                TEXT_GROUP_2A[64] = 0;
+                TEXT_GROUP_2A2B[64] = 0;
             }
 
-            TEXT_GROUP_2A[pos * 4 + 0] = (char)c1;
-            TEXT_GROUP_2A[pos * 4 + 1] = (char)c2;
-            TEXT_GROUP_2A[pos * 4 + 2] = (char)c3;
-            TEXT_GROUP_2A[pos * 4 + 3] = (char)c4;
+            TEXT_GROUP_2A2B[pos * 4 + 0] = (char)c1;
+            TEXT_GROUP_2A2B[pos * 4 + 1] = (char)c2;
+            TEXT_GROUP_2A2B[pos * 4 + 2] = (char)c3;
+            TEXT_GROUP_2A2B[pos * 4 + 3] = (char)c4;
 
 #ifdef DEBUG_SILAB
             LOGI("[%d] TXT[%c%c%c%c]", pos, c1, c2 , c3, c4);
-            LOGI("RDS TEXT [%s]\n", TEXT_GROUP_2A);
+            LOGI("RDS TEXT [%s]\n", TEXT_GROUP_2A2B);
 #endif
             if (pos == 0) {
-                if (wait2a == false) {
+                if (wait2a2b == false) {
                     return RDS_EVENT_LAST_RADIOTEXT | RDS_EVENT_PTY;
                 } else {
-                    wait2a = false;
+                    wait2a2b = false;
                 }
             }
-
 #if 0
         } else {
-            //wait2a = true;
+            //wait2a2b = true;
 #endif
         }
     }
@@ -343,28 +414,34 @@ jshort readRds(JNIEnv *env, jobject thiz) {
 }
 
 jbyteArray getPs(JNIEnv *env, jobject thiz) {
-    return NULL;
+    LOGI("SEND PS [%s]", PS_GROUP);
+    jbyteArray radiotext9 = env->NewByteArray(9);
+    env->SetByteArrayRegion(radiotext9, 0, 9, (const jbyte*)&PS_GROUP[0]);
+    return radiotext9;
 }
 
 jbyteArray getLrText(JNIEnv *env, jobject thiz) {
-    LOGI("SEND LTR [%s]", LRT_GROUP_2A);
+    LOGI("SEND LTR [%s]", LRT_GROUP);
     jbyteArray radiotext64 = env->NewByteArray(65);
-    env->SetByteArrayRegion(radiotext64, 0, 65, (const jbyte*)&LRT_GROUP_2A[0]);
+    env->SetByteArrayRegion(radiotext64, 0, 65, (const jbyte*)&LRT_GROUP[0]);
     return radiotext64;
 }
 
 jshort activeAf(JNIEnv *env, jobject thiz) {
-    u32 freq;
+    LOGI("SEND AF [%fMHz]", (float)altfreq / 100.0f);
+    /*
+    u32 freq = (u32)altfreq;
     if (getfreq (&freq) == SILAB_TRUE) {
         LOGI("Active AF %fMHz", (float)freq / 100.0f);
         return (jshort)freq;
     }
-    return 0;
+    */
+    return altfreq;
 }
 
 jint setRds(JNIEnv *env, jobject thiz, jboolean rdson) {
     if (rdson) {
-        wait2a = true;
+        wait2a2b = true;
         disablerds();
         enablerds();
         resetrds();
