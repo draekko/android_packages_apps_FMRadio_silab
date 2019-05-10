@@ -80,6 +80,15 @@ int disablerds () {
 	return SILAB_FALSE;
 }
 
+int getrdsdata (struct radio_data_t *rds) {
+	if (ioctl(fd, SI47XX_IOC_RDS_DATA_GET, rds) != -1) {
+		//LOGI("SI47XX_IOC_RDS_DATA_GET\n");
+		return SILAB_TRUE;
+    } 
+    LOGI("GET RDS DATA ERROR\n");
+	return SILAB_FALSE;
+}
+
 /* ================================================= */
 
 int setsysconfig2 (struct sys_config2 *config2) {
@@ -184,6 +193,15 @@ int setvolume (u8 vol) {
 int setfreq (u32 freq) {
 	if (ioctl(fd, SI47XX_IOC_CHAN_SELECT, &freq) != -1) {
 		LOGI("SI47XX_IOC_CHAN_SELECT\n");
+		return SILAB_TRUE;
+    } 
+    LOGI("CHAN SELECT ERROR\n");
+	return SILAB_FALSE;
+}
+
+int getfreq (u32 *freq) {
+	if (ioctl(fd, SI47XX_IOC_CHAN_GET, freq) != -1) {
+		LOGI("SI47XX_IOC_CHAN_GET\n");
 		return SILAB_TRUE;
     } 
     LOGI("CHAN SELECT ERROR\n");

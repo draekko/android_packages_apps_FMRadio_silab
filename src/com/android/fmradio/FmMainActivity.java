@@ -317,6 +317,9 @@ public class FmMainActivity extends Activity implements FmFavoriteEditDialog.Edi
                     bundle = msg.getData();
                     String rtString = bundle.getString(FmListener.KEY_RT_INFO);
                     mTextRds.setText(rtString);
+                    mTextRds.setSelected(true);
+                    mTextRds.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+                    mTextRds.setSingleLine(true);
                     break;
 
                 case FmListener.LISTEN_SPEAKER_MODE_CHANGED:

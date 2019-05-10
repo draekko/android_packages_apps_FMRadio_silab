@@ -31,6 +31,19 @@ typedef __u8 u8;
 typedef __u16 u16;
 typedef __u32 u32;
 
+struct radio_data_t {
+	u16 rdsa;
+	u16 rdsb;
+	u16 rdsc;
+	u16 rdsd;
+	u8 curr_rssi;
+	u32 curr_channel;
+	u8 blera;
+	u8 blerb;
+	u8 blerc;
+	u8 blerd;
+};
+
 struct sys_config2 {
 	u16 rssi_th;
 	u8 fm_band;
@@ -66,9 +79,11 @@ int setdsmuteoff ();
 int enablerds ();
 int disablerds ();
 int resetrds ();
+int getrdsdata (struct radio_data_t *rds);
 int setsysconfig2 (struct sys_config2 *config2);
 int setsysconfig3 (struct sys_config3 *config3);
 int setvolume (u8 vol);
+int getfreq (u32 *freq);
 int setfreq (u32 freq);
 int seekdown(u32 *freq);
 int seekup(u32 *freq);
@@ -105,7 +120,7 @@ int seekstop();
 #define SI47XX_IOC_RSSI_SEEK_TH_SET	_IOW(SI47XX_IOC_MAGIC, 9, u8)
 #define SI47XX_IOC_SEEK_SNR_SET		_IOW(SI47XX_IOC_MAGIC, 10, u8)
 #define SI47XX_IOC_SEEK_CNT_SET		_IOW(SI47XX_IOC_MAGIC, 11, u8)
-#define SI47XX_IOC_CUR_RSSI_GET		_IOR(SI47XX_IOC_MAGIC, 12, struct rssi_snr_t)
+//#define SI47XX_IOC_CUR_RSSI_GET		_IOR(SI47XX_IOC_MAGIC, 12, struct rssi_snr_t)
 #define SI47XX_IOC_VOLEXT_ENB		_IO(SI47XX_IOC_MAGIC, 13)
 #define SI47XX_IOC_VOLEXT_DISB		_IO(SI47XX_IOC_MAGIC, 14)
 #define SI47XX_IOC_VOLUME_SET		_IOW(SI47XX_IOC_MAGIC, 15, u8)
@@ -114,7 +129,7 @@ int seekstop();
 #define SI47XX_IOC_MUTE_OFF		    _IO(SI47XX_IOC_MAGIC, 18)
 #define SI47XX_IOC_MONO_SET		    _IO(SI47XX_IOC_MAGIC, 19)
 #define SI47XX_IOC_STEREO_SET		_IO(SI47XX_IOC_MAGIC, 20)
-#define SI47XX_IOC_RSTATE_GET		_IOR(SI47XX_IOC_MAGIC, 21, struct dev_state_t)
+//#define SI47XX_IOC_RSTATE_GET		_IOR(SI47XX_IOC_MAGIC, 21, struct dev_state_t)
 #define SI47XX_IOC_RDS_DATA_GET		_IOR(SI47XX_IOC_MAGIC, 22, struct radio_data_t)
 #define SI47XX_IOC_RDS_ENABLE		_IO(SI47XX_IOC_MAGIC, 23)
 #define SI47XX_IOC_RDS_DISABLE		_IO(SI47XX_IOC_MAGIC, 24)
@@ -124,8 +139,8 @@ int seekstop();
 /* VNVS:START 13-OCT'09 :
  * Added IOCTLs for reading the device-id,chip-id,power configuration,
  * system configuration2 registers*/
-#define SI47XX_IOC_DEVICE_ID_GET	_IOR(SI47XX_IOC_MAGIC, 27, struct device_id)
-#define SI47XX_IOC_CHIP_ID_GET		_IOR(SI47XX_IOC_MAGIC, 28, struct chip_id)
+//#define SI47XX_IOC_DEVICE_ID_GET	_IOR(SI47XX_IOC_MAGIC, 27, struct device_id)
+//#define SI47XX_IOC_CHIP_ID_GET		_IOR(SI47XX_IOC_MAGIC, 28, struct chip_id)
 #define SI47XX_IOC_SYS_CONFIG2_GET	_IOR(SI47XX_IOC_MAGIC, 29, struct sys_config2)
 #define SI47XX_IOC_POWER_CONFIG_GET	_IO(SI47XX_IOC_MAGIC, 30)
 
@@ -137,7 +152,7 @@ int seekstop();
  */
 #define SI47XX_IOC_DE_SET		    _IOW(SI47XX_IOC_MAGIC, 32, u8)
 #define SI47XX_IOC_SYS_CONFIG3_GET	_IOR(SI47XX_IOC_MAGIC, 33, struct sys_config3)
-#define SI47XX_IOC_STATUS_RSSI_GET	_IOR(SI47XX_IOC_MAGIC, 34, struct status_rssi)
+//#define SI47XX_IOC_STATUS_RSSI_GET	_IOR(SI47XX_IOC_MAGIC, 34, struct status_rssi)
 #define SI47XX_IOC_SYS_CONFIG2_SET	_IOW(SI47XX_IOC_MAGIC, 35, struct sys_config2)
 #define SI47XX_IOC_SYS_CONFIG3_SET	_IOW(SI47XX_IOC_MAGIC, 36, struct sys_config3)
 #define SI47XX_IOC_DSMUTE_ON		_IO(SI47XX_IOC_MAGIC, 37)

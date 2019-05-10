@@ -37,6 +37,12 @@
 #endif
 #define LOG_TAG "LIBFMSILAB_JNI"
 
+
+char TEXT_GROUP_2A[65];
+char LRT_GROUP_2A[65];
+bool wait2a = true;
+
+struct radio_data_t rds;
 int scanning = 0;
 
 jboolean openDev(JNIEnv *env, jobject thiz) {
@@ -47,6 +53,14 @@ jboolean openDev(JNIEnv *env, jobject thiz) {
         return JNI_FALSE;
     }
     setFd(fd);
+
+    for (int p = 0; p < 64; p++) {
+        TEXT_GROUP_2A[p] = 32;
+        LRT_GROUP_2A[p] = 32;
+    }
+    TEXT_GROUP_2A[64] = 0;
+    LRT_GROUP_2A[64] = 0;
+
     return JNI_TRUE;
 }
 
@@ -160,6 +174,8 @@ jboolean tune(JNIEnv *env, jobject thiz, jfloat freq) {
 
     LOGI("%s, [freq=%d]\n", __func__, (int)freq);
 
+    wait2a = true;
+
 	if (setdsmuteon() != SILAB_TRUE) {
         status = JNI_FALSE;
     }
@@ -207,6 +223,7 @@ jboolean tune(JNIEnv *env, jobject thiz, jfloat freq) {
 jfloat seek(JNIEnv *env, jobject thiz, jfloat freq, jboolean isUp) {
     u32 frq;
     LOGI("%s, [freq=%d][SCAN %s]\n", __func__, (int)freq, isUp?"UP":"DOWN");
+    wait2a = true;
     if (isUp == JNI_TRUE) {
 	    if (seekup(&frq) != SILAB_TRUE) {
             return 0;
@@ -246,6 +263,7 @@ jshortArray autoScan(JNIEnv *env, jobject thiz) {
             return NULL;
         }
         if (seekfreq >= topfreq) {
+            count+=1;
             scanning = 0;
             break;
         }
@@ -253,16 +271,75 @@ jshortArray autoScan(JNIEnv *env, jobject thiz) {
     }
     scanning = 0;
 
-    jshortArray scanlistings = env->NewShortArray(count+1);
-    env->SetShortArrayRegion(scanlistings, 0, count+1, (const jshort*)&scanlist[0]);
+    jshortArray scanlistings = env->NewShortArray(count);
+    env->SetShortArrayRegion(scanlistings, 0, count, (const jshort*)&scanlist[0]);
 
     return scanlistings;
 }
 
 jshort readRds(JNIEnv *env, jobject thiz) {
-    int ret = 0;
-    uint16_t status = 0;
-    return status;
+    if (getrdsdata(&rds) == SILAB_TRUE)  {
+#ifdef DEBUG_SILAB
+        LOGI("RDS RSSI %d, FRQ %fMHz\n", rds.curr_rssi,  (float)rds.curr_channel / 100.0f);
+        LOGI("RDS rdsabcd 0x%04X|%d 0x%04X|%d 0x%04X|%d 0x%04X|%d\n", rds.rdsa, rds.rdsa, rds.rdsb, rds.rdsb, rds.rdsc, rds.rdsc, rds.rdsd, rds.rdsd);
+        LOGI("RDS blerabcd %d %d %d %d\n", rds.blera, rds.blerb, rds.blerc, rds.blerd);
+#endif
+        int picode = rds.rdsa;
+        int grpcode = rds.rdsb >> 11;
+        bool clear = false;
+        if (grpcode == 0x1) {
+            picode = rds.rdsc;
+        } else if (grpcode == GROUP_TYPE_2A || grpcode == GROUP_TYPE_2B) {
+            if ((rds.rdsb & 0x10) == 0x10) {
+                clear = true;
+            } else {
+                clear = false;
+            }
+            int pos = rds.rdsb & 0xf;
+            int pty = (rds.rdsb > 5) & 0x1f;
+		    u8 c1 = (u8)(rds.rdsc >> 8);
+		    u8 c2 = (u8)(rds.rdsc & 0xFF);
+		    u8 c3 = (u8)(rds.rdsd >> 8);
+		    u8 c4 = (u8)(rds.rdsd & 0xFF);
+            if (c1 < 32 || c1 > 126) c1 = 32;
+            if (c2 < 32 || c2 > 126) c2 = 32;
+            if (c3 < 32 || c3 > 126) c3 = 32;
+            if (c4 < 32 || c4 > 126) c4 = 32;
+            if (pos == 0) {
+                for (int p = 0; p < 65; p++) {
+                    LRT_GROUP_2A[p] = TEXT_GROUP_2A[p];
+                }
+                for (int p = 0; p < 64; p++) {
+                    TEXT_GROUP_2A[p] = 32;
+                }
+                TEXT_GROUP_2A[64] = 0;
+            }
+
+            TEXT_GROUP_2A[pos * 4 + 0] = (char)c1;
+            TEXT_GROUP_2A[pos * 4 + 1] = (char)c2;
+            TEXT_GROUP_2A[pos * 4 + 2] = (char)c3;
+            TEXT_GROUP_2A[pos * 4 + 3] = (char)c4;
+
+#ifdef DEBUG_SILAB
+            LOGI("[%d] TXT[%c%c%c%c]", pos, c1, c2 , c3, c4);
+            LOGI("RDS TEXT [%s]\n", TEXT_GROUP_2A);
+#endif
+            if (pos == 0) {
+                if (wait2a == false) {
+                    return RDS_EVENT_LAST_RADIOTEXT | RDS_EVENT_PTY;
+                } else {
+                    wait2a = false;
+                }
+            }
+
+#if 0
+        } else {
+            //wait2a = true;
+#endif
+        }
+    }
+
+    return 0;
 }
 
 jbyteArray getPs(JNIEnv *env, jobject thiz) {
@@ -270,18 +347,32 @@ jbyteArray getPs(JNIEnv *env, jobject thiz) {
 }
 
 jbyteArray getLrText(JNIEnv *env, jobject thiz) {
-    return NULL;
+    LOGI("SEND LTR [%s]", LRT_GROUP_2A);
+    jbyteArray radiotext64 = env->NewByteArray(65);
+    env->SetByteArrayRegion(radiotext64, 0, 65, (const jbyte*)&LRT_GROUP_2A[0]);
+    return radiotext64;
 }
 
 jshort activeAf(JNIEnv *env, jobject thiz) {
+    u32 freq;
+    if (getfreq (&freq) == SILAB_TRUE) {
+        LOGI("Active AF %fMHz", (float)freq / 100.0f);
+        return (jshort)freq;
+    }
     return 0;
 }
 
-jshortArray getAFList(JNIEnv *env, jobject thiz) {
-    return NULL;
-}
-
 jint setRds(JNIEnv *env, jobject thiz, jboolean rdson) {
+    if (rdson) {
+        wait2a = true;
+        disablerds();
+        enablerds();
+        resetrds();
+        return JNI_TRUE;
+    } else {
+        disablerds();
+        return JNI_TRUE;
+    }
     return JNI_FALSE;
 }
 
@@ -296,6 +387,15 @@ jboolean stopScan(JNIEnv *env, jobject thiz) {
 }
 
 jint setMute(JNIEnv *env, jobject thiz, jboolean mute) {
+    if (mute) {
+    	if (setmuteon() == SILAB_TRUE) {
+            return JNI_TRUE;
+        }
+    } else {
+    	if (setmuteoff() == SILAB_TRUE) {
+            return JNI_TRUE;
+        }
+    }
     return JNI_FALSE;
 }
 
@@ -314,8 +414,7 @@ static JNINativeMethod methodsRx[] = {
     {"readRds",   "()S", (void*)readRds },    //11
     {"getPs",     "()[B", (void*)getPs  },    //12
     {"getLrText", "()[B", (void*)getLrText},  //13
-    {"activeAf",  "()S", (void*)activeAf},    //14
-    {"setMute",	"(Z)I", (void*)setMute},      //15
+    {"setMute",	"(Z)I", (void*)setMute},      //14
 };
 
 /*

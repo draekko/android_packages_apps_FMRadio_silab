@@ -94,11 +94,13 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
 
     // RDS events
     // PS
-    private static final int RDS_EVENT_PROGRAMNAME = 0x0008;
     // RT
-    private static final int RDS_EVENT_LAST_RADIOTEXT = 0x0040;
     // AF
+    // PTY
+    private static final int RDS_EVENT_PROGRAMNAME = 0x0008;
+    private static final int RDS_EVENT_LAST_RADIOTEXT = 0x0040;
     private static final int RDS_EVENT_AF = 0x0080;
+    private static final int RDS_EVENT_PTY = 0x0100;
 
     // Headset
     private static final int HEADSET_PLUG_IN = 1;
@@ -228,12 +230,24 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
 
     private final String CHANNEL_ID = "FMRADIO_CHAN_ID";
     private final String CHANNEL_NAME = "FM RADIO";
+
     private NotificationManager mManager = null;
     private NotificationChannel mNotificationChannel = null;
     private Notification.Builder mNotificationBuilder = null;
     private BigTextStyle mNotificationStyle = null;
 
     private ContentResolver mResolver;
+
+    private String programUSCATypes[] = { 
+        "No program type",  "News",                "Information",           "Sports",
+        "Talk",             "Rock",                "Classic Rock",          "Adult Hits",
+        "Soft Rock",        "Top 40",              "Country",               "Oldies",
+        "Soft",             "Nostalgia",           "Jazz",                  "Classical",
+        "Rhythm & Blues",   "Soft Rhythm & Blues", "Foreign Language",      "Religious Music",
+        "Religious Talk",   "Personality",         "Public",                "College",
+        "Spanish Talk",     "Spanish Music",       "Hip-Hop",               "Unassigned",
+        "Unassigned",       "Weather",             "Emergency Test",        "Emergency" 
+    };
 
     @Override
     public IBinder onBind(Intent intent) {
@@ -1022,6 +1036,7 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
         }
 
         int frequency = FmNative.activeAf();
+        Log.d(TAG, "Active AF " + (float)frequency / 100.0f + "MHz");
         return frequency;
     }
 
@@ -1074,7 +1089,7 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
      * @return (true, support; false, not support)
      */
     public boolean isRdsSupported() {
-        return false;
+        return true;
     }
 
     /**
@@ -1600,9 +1615,9 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
                     }
 
                     int iRdsEvents = FmNative.readRds();
-                    if (iRdsEvents != 0) {
-                        Log.d(TAG, "startRdsThread, is rds events: " + iRdsEvents);
-                    }
+                    //if (iRdsEvents != 0) {
+                    //    Log.d(TAG, "startRdsThread, is rds events: " + iRdsEvents);
+                    //}
 
                     if (RDS_EVENT_PROGRAMNAME == (RDS_EVENT_PROGRAMNAME & iRdsEvents)) {
                         byte[] bytePS = FmNative.getPs();
@@ -1658,6 +1673,7 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
                             Log.d(TAG, "startRdsThread, fm is power down, do nothing.");
                         } else {
                             int iFreq = FmNative.activeAf();
+                            Log.d(TAG, "Active AF " + (float)iFreq / 100.0f + "MHz");
                             if (FmUtils.isValidStation(iFreq)) {
                                 // if the new frequency is not equal to current
                                 // frequency.
@@ -1672,10 +1688,10 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
                         }
                     }
                     // Do not handle other events.
-                    // Sleep 500ms to reduce inquiry frequency
+                    // Sleep 20ms to reduce inquiry frequency
                     try {
-                        final int hundredMillisecond = 500;
-                        Thread.sleep(hundredMillisecond);
+                        final int milliseconds = 20;
+                        Thread.sleep(milliseconds);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }

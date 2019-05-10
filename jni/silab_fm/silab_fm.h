@@ -34,4 +34,12 @@
 #define DE_TIME_CONSTANT_50	    1	/*Europe,Japan,Australia */
 #define DE_TIME_CONSTANT_75	    0	/*US*/
 
+#define GROUP_TYPE_2A (2 * 2 + 0)
+#define GROUP_TYPE_2B (2 * 2 + 1)
+
+#define RDS_EVENT_PROGRAMNAME    0x0008
+#define RDS_EVENT_LAST_RADIOTEXT 0x0040
+#define RDS_EVENT_AF             0x0080
+#define RDS_EVENT_PTY            0x0100
+
 #endif // __SILAB_FM_H__
