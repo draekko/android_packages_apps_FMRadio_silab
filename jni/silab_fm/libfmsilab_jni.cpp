@@ -47,6 +47,7 @@ bool wait0a0b = true;
 short altfreq;
 struct radio_data_t rds;
 int scanning = 0;
+float mFreq = -1;
 
 jboolean openDev(JNIEnv *env, jobject thiz) {
     int ret = 0;
@@ -140,7 +141,7 @@ jboolean powerUp(JNIEnv *env, jobject thiz, jfloat freq) {
         status = JNI_FALSE;
     }
 
-	if (setvolume(8)  != SILAB_TRUE) {
+	if (setvolume(15)  != SILAB_TRUE) {
         status = JNI_FALSE;
     }
 
@@ -169,10 +170,26 @@ jboolean powerUp(JNIEnv *env, jobject thiz, jfloat freq) {
         status = JNI_FALSE;
     }
 
+	if (enablerds() != SILAB_TRUE) {
+        status = JNI_FALSE;
+    }
+
+	if (enabledigitalmode() != SILAB_TRUE) {
+        status = JNI_FALSE;
+    }
+
+    if (status == JNI_FALSE) {
+	mFreq = -1;
+    } else {
+	mFreq = freq;
+    }
+
     return status;
 }
 
 jboolean powerDown(JNIEnv *env, jobject thiz, jint type) {
+	disabledigitalmode();
+
 	if (powerdown() != SILAB_TRUE) {
         return JNI_FALSE;
     }
@@ -219,12 +236,18 @@ jboolean tune(JNIEnv *env, jobject thiz, jfloat freq) {
         status = JNI_FALSE;
     }
 
-	if (setvolume(8) != SILAB_TRUE) {
+	if (setvolume(15) != SILAB_TRUE) {
         status = JNI_FALSE;
     }
 
 	if (setmuteoff() != SILAB_TRUE) {
         status = JNI_FALSE;
+    }
+
+    if (status == JNI_FALSE) {
+	mFreq = -1;
+    } else {
+	mFreq = freq;
     }
 
     return status;
@@ -246,6 +269,9 @@ jfloat seek(JNIEnv *env, jobject thiz, jfloat freq, jboolean isUp) {
     LOGI("%s, [freq=%d]\n", __func__, frq);
     float retfreq = (float)((float)frq / 100.0f);
     LOGI("%s, [retfreq=%f]\n", __func__, retfreq);
+
+	mFreq = retfreq;
+
     return retfreq;
 }
 
@@ -330,7 +356,9 @@ jshort readRds(JNIEnv *env, jobject thiz) {
                     wait0a0b = false;
                 }
             }
+#ifdef DEBUG_RDS
             LOGI("TEXT_GROUP_0A0B[%d][%s]\n", pos, TEXT_GROUP_0A0B);
+#endif
         } else if (grpcode == GROUP_TYPE_0B) {
             int pos = rds.rdsb & 0x3;
 		    u8 c1 = (u8)(rds.rdsd >> 8);
@@ -355,8 +383,10 @@ jshort readRds(JNIEnv *env, jobject thiz) {
                 } else {
                     wait0a0b = false;
                 }
-            }        
+            }
+#ifdef DEBUG_RDS
             LOGI("TEXT_GROUP_0A0B[%d][%s]\n", pos, TEXT_GROUP_0A0B);
+#endif
         } else if (grpcode == GROUP_TYPE_2A || grpcode == GROUP_TYPE_2B) {
             if ((rds.rdsb & 0x10) == 0x10) {
                 clear = true;
@@ -369,14 +399,17 @@ jshort readRds(JNIEnv *env, jobject thiz) {
 		    u8 c2 = (u8)(rds.rdsc & 0xFF);
 		    u8 c3 = (u8)(rds.rdsd >> 8);
 		    u8 c4 = (u8)(rds.rdsd & 0xFF);
-            //if (c1 < 32 || c1 > 126) c1 = 32;
-            //if (c2 < 32 || c2 > 126) c2 = 32;
-            //if (c3 < 32 || c3 > 126) c3 = 32;
-            //if (c4 < 32 || c4 > 126) c4 = 32;
+#if 0
+            if (c1 < 32 || c1 > 126) c1 = 32;
+            if (c2 < 32 || c2 > 126) c2 = 32;
+            if (c3 < 32 || c3 > 126) c3 = 32;
+            if (c4 < 32 || c4 > 126) c4 = 32;
+#else
             if (c1 < 32) c1 = 32;
             if (c2 < 32) c2 = 32;
             if (c3 < 32) c3 = 32;
             if (c4 < 32) c4 = 32;
+#endif
             if (pos == 0) {
                 for (int p = 0; p < 65; p++) {
                     LRT_GROUP[p] = TEXT_GROUP_2A2B[p];
@@ -405,7 +438,7 @@ jshort readRds(JNIEnv *env, jobject thiz) {
             }
 #if 0
         } else {
-            //wait2a2b = true;
+            wait2a2b = true;
 #endif
         }
     }
@@ -414,29 +447,21 @@ jshort readRds(JNIEnv *env, jobject thiz) {
 }
 
 jbyteArray getPs(JNIEnv *env, jobject thiz) {
+#ifdef DEBUG_RDS
     LOGI("SEND PS [%s]", PS_GROUP);
+#endif
     jbyteArray radiotext9 = env->NewByteArray(9);
     env->SetByteArrayRegion(radiotext9, 0, 9, (const jbyte*)&PS_GROUP[0]);
     return radiotext9;
 }
 
 jbyteArray getLrText(JNIEnv *env, jobject thiz) {
+#ifdef DEBUG_RDS
     LOGI("SEND LTR [%s]", LRT_GROUP);
+#endif
     jbyteArray radiotext64 = env->NewByteArray(65);
     env->SetByteArrayRegion(radiotext64, 0, 65, (const jbyte*)&LRT_GROUP[0]);
     return radiotext64;
-}
-
-jshort activeAf(JNIEnv *env, jobject thiz) {
-    LOGI("SEND AF [%fMHz]", (float)altfreq / 100.0f);
-    /*
-    u32 freq = (u32)altfreq;
-    if (getfreq (&freq) == SILAB_TRUE) {
-        LOGI("Active AF %fMHz", (float)freq / 100.0f);
-        return (jshort)freq;
-    }
-    */
-    return altfreq;
 }
 
 jint setRds(JNIEnv *env, jobject thiz, jboolean rdson) {
@@ -476,22 +501,51 @@ jint setMute(JNIEnv *env, jobject thiz, jboolean mute) {
     return JNI_FALSE;
 }
 
+/*
+jshort activeAf(JNIEnv *env, jobject thiz) {
+    LOGI("SEND AF [%fMHz]", (float)altfreq / 100.0f);
+    //u32 freq = (u32)altfreq;
+    //if (getfreq (&freq) == SILAB_TRUE) {
+    //    LOGI("Active AF %fMHz", (float)freq / 100.0f);
+    //    return (jshort)freq;
+    //}
+    return altfreq;
+}
+*/
+
+jshort activeAf(JNIEnv *env, jobject thiz) {
+    return mFreq;
+}
+
+jboolean enableDM(JNIEnv *env, jobject thiz) {
+    enabledigitalmode();
+    return true;
+}
+
+jboolean disableDM(JNIEnv *env, jobject thiz) {
+    disabledigitalmode();
+    return true;
+}
+
 static const char *classPathNameRx = "com/android/fmradio/FmNative";
 
 static JNINativeMethod methodsRx[] = {
-    {"openDev", "()Z", (void*)openDev },      //1
-    {"closeDev", "()Z", (void*)closeDev },    //2
-    {"powerUp", "(F)Z", (void*)powerUp },     //3
-    {"powerDown", "(I)Z", (void*)powerDown }, //4
-    {"tune", "(F)Z", (void*)tune },           //5
-    {"seek", "(FZ)F", (void*)seek },          //6
-    {"autoScan",  "()[S", (void*)autoScan },  //7
-    {"stopScan",  "()Z", (void*)stopScan },   //8
-    {"setRds",    "(Z)I", (void*)setRds  },   //10
-    {"readRds",   "()S", (void*)readRds },    //11
-    {"getPs",     "()[B", (void*)getPs  },    //12
-    {"getLrText", "()[B", (void*)getLrText},  //13
-    {"setMute",	"(Z)I", (void*)setMute},      //14
+    {"openDev",   "()Z",   (void*)openDev   }, //1
+    {"closeDev",  "()Z",   (void*)closeDev  }, //2
+    {"powerUp",   "(F)Z",  (void*)powerUp   }, //3
+    {"powerDown", "(I)Z",  (void*)powerDown }, //4
+    {"tune",      "(F)Z",  (void*)tune      }, //5
+    {"seek",      "(FZ)F", (void*)seek      }, //6
+    {"autoScan",  "()[S",  (void*)autoScan  }, //7
+    {"stopScan",  "()Z",   (void*)stopScan  }, //8
+    {"setRds",    "(Z)I",  (void*)setRds    }, //9
+    {"readRds",   "()S",   (void*)readRds   }, //10
+    {"getPs",     "()[B",  (void*)getPs     }, //11
+    {"getLrText", "()[B",  (void*)getLrText }, //12
+    {"setMute",	  "(Z)I",  (void*)setMute   }, //13
+    {"activeAf",  "()S",   (void*)openDev   }, //14
+    {"enableDM",  "()Z",   (void*)openDev   }, //15
+    {"disableDM", "()Z",   (void*)openDev   }, //16
 };
 
 /*

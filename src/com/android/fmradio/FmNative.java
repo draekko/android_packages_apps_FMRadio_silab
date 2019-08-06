@@ -135,4 +135,18 @@ public class FmNative {
      * @return (true, success; false, failed)
      */
     static native int setMute(boolean mute);
+
+    /**
+     * Enable DIGITAL Mode
+     *
+     * @return (true, success; false, failed)
+     */
+    static native boolean enableDM();
+
+    /**
+     * Disable DIGITAL Mode
+     *
+     * @return (true, success; false, failed)
+     */
+    static native boolean disableDM();
 }

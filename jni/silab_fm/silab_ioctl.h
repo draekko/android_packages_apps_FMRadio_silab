@@ -89,6 +89,9 @@ int seekdown(u32 *freq);
 int seekup(u32 *freq);
 int seekfull(u32 *freqs);
 int seekstop();
+short activeaf();
+int enabledigitalmode();
+int disabledigitalmode();
 
 #ifndef KERNEL_IOCTL
 #define KERNEL_IOCTL
@@ -102,7 +105,7 @@ int seekstop();
 #define SI47XX_IOC_MAGIC		0xFA
 
 /* MAX SEQ NUMBER */
-#define SI47XX_IOC_NR_MAX		40
+#define SI47XX_IOC_NR_MAX		42
 
 /* COMMANDS */
 #define SI47XX_IOC_POWERUP		    _IO(SI47XX_IOC_MAGIC, 0)
@@ -159,6 +162,8 @@ int seekstop();
 #define SI47XX_IOC_DSMUTE_OFF		_IO(SI47XX_IOC_MAGIC, 38)
 #define SI47XX_IOC_RESET_RDS_DATA	_IO(SI47XX_IOC_MAGIC, 39)
 #define SI47XX_IOC_SEEK_FULL		_IOR(SI47XX_IOC_MAGIC, 40, u32)
+#define SI47XX_IOC_ENABLE_DIGITALMODE _IO(SI47XX_IOC_MAGIC, 41)
+#define SI47XX_IOC_DISABLE_DIGITALMODE _IO(SI47XX_IOC_MAGIC, 42)
 
 #endif /* KERNEL_IOCTL */
 #endif /* __SILAB_IOCTL_H_ */

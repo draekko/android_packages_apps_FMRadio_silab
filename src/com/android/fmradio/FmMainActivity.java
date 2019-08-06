@@ -217,9 +217,9 @@ public class FmMainActivity extends Activity implements FmFavoriteEditDialog.Edi
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
-            Log.d(TAG,
-                    "mHandler.handleMessage, what = " + msg.what + ",hashcode:"
-                            + mHandler.hashCode());
+            //Log.d(TAG,
+            //        "mHandler.handleMessage, what = " + msg.what + ",hashcode:"
+            //                + mHandler.hashCode());
             Bundle bundle;
             switch (msg.what) {
 

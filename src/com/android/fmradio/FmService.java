@@ -565,7 +565,7 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
                     if (isRender()) {
                         // Speaker mode or BT a2dp mode will come here and keep reading and writing.
                         // If we want FM sound output from speaker or BT a2dp, we must record data
-                        // to AudioRecrd and write data to AudioTrack.
+                        // to AudioRecord and write data to AudioTrack.
                         if (mAudioRecord.getRecordingState() == AudioRecord.RECORDSTATE_STOPPED) {
                             mAudioRecord.startRecording();
                         }
@@ -717,7 +717,9 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
         }
         mPowerStatus = POWER_UP;
         // need mute after power up
-        setMute(true);
+        //setMute(true);
+
+        //FmNative.enableDM();
 
         return (mPowerStatus == POWER_UP);
     }
@@ -777,6 +779,8 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
         if (mFmRecorder != null) {
             stopRecording();
         }
+
+        //FmNative.disableDM();
 
         setMute(true);
         setRds(false);
@@ -1036,7 +1040,8 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
         }
 
         int frequency = FmNative.activeAf();
-        Log.d(TAG, "Active AF " + (float)frequency / 100.0f + "MHz");
+        if (frequency > 0)
+            Log.d(TAG, "Active AF " + (float)frequency / 100.0f + "MHz");
         return frequency;
     }
 
@@ -1376,11 +1381,17 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
     private synchronized void initAudioRecordSink() {
         mAudioRecord = new AudioRecord(MediaRecorder.AudioSource.RADIO_TUNER,
                 SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, RECORD_BUF_SIZE);
-        if (mAudioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
+        if (mAudioRecord == null) {
+            Log.d(TAG, "\n==============\ninitAudioRecordSink, mAudioRecord null\n==============\n");
+        }
+        if (mAudioRecord == null || mAudioRecord.getState() != AudioRecord.STATE_INITIALIZED) {
             Log.d(TAG, "\n==============\ninitAudioRecordSink, mAudioRecord not initialized\n==============\n");
         }
         mAudioTrack = new AudioTrack(AudioManager.STREAM_MUSIC,
                 SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT, RECORD_BUF_SIZE, AudioTrack.MODE_STREAM);
+        if (mAudioTrack == null) {
+            Log.d(TAG, "\n==============\ninitAudioRecordSink, mAudioTrack null\n==============\n");
+        }
         if (mAudioTrack.getState() != AudioRecord.STATE_INITIALIZED) {
             Log.d(TAG, "\n==============\ninitAudioRecordSink, mAudioTrack not initialized\n==============\n");
         }
@@ -1673,15 +1684,17 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
                             Log.d(TAG, "startRdsThread, fm is power down, do nothing.");
                         } else {
                             int iFreq = FmNative.activeAf();
-                            Log.d(TAG, "Active AF " + (float)iFreq / 100.0f + "MHz");
-                            if (FmUtils.isValidStation(iFreq)) {
-                                // if the new frequency is not equal to current
-                                // frequency.
-                                if (mCurrentStation != iFreq) {
-                                    if (!mIsScanning && !mIsSeeking) {
-                                        Log.d(TAG, "startRdsThread, seek or scan not going,"
-                                                + "need to tune here");
-                                        tuneStationAsync(FmUtils.computeFrequency(iFreq));
+                            if (iFreq > 0) {
+                                Log.d(TAG, "Active AF " + (float)iFreq / 100.0f + "MHz");
+                                if (FmUtils.isValidStation(iFreq)) {
+                                    // if the new frequency is not equal to current
+                                    // frequency.
+                                    if (mCurrentStation != iFreq) {
+                                        if (!mIsScanning && !mIsSeeking) {
+                                            Log.d(TAG, "startRdsThread, seek or scan not going,"
+                                                    + "need to tune here");
+                                            tuneStationAsync(FmUtils.computeFrequency(iFreq));
+                                        }
                                     }
                                 }
                             }
@@ -1847,19 +1860,14 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
      * Show notification
      */
     private void showPlayingNotification() {
-        Log.d(TAG, "\n====== 1 =======\n");
-
         if (isActivityForeground() || mIsScanning
                 || (getRecorderState() == FmRecorder.STATE_RECORDING)) {
-            Log.d(TAG, "\n====== 2 =======\n");
             return;
         }
         String stationName = "";
         String radioText = "";
-        //ContentResolver resolver = mContext.getContentResolver();
         Cursor cursor = null;
         try {
-            Log.d(TAG, "\n====== 3 =======\n");
             cursor = mResolver.query(
                     Station.CONTENT_URI,
                     FmStation.COLUMNS,
@@ -1873,8 +1881,6 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
                     stationName = cursor.getString(cursor.getColumnIndex(Station.PROGRAM_SERVICE));
                 }
                 radioText = cursor.getString(cursor.getColumnIndex(Station.RADIO_TEXT));
-
-                Log.d(TAG, "\n====== 4 =======\n");
             } else {
                 Log.d(TAG, "showPlayingNotification, cursor is null");
             }
@@ -1884,8 +1890,6 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
             }
         }
 
-        Log.d(TAG, "\n====== 5 =======\n");
-
         Intent aIntent = new Intent(Intent.ACTION_MAIN);
         aIntent.addCategory(Intent.CATEGORY_LAUNCHER);
         aIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -1894,11 +1898,9 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
 
         if (mManager == null) {
             mManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            Log.d(TAG, "\n====== 6 =======\n");
         }
 
         if (mNotificationChannel == null) {
-            Log.d(TAG, "\n====== 7 =======\n");
             mNotificationChannel =
                     new NotificationChannel(CHANNEL_ID, CHANNEL_NAME,
                             NotificationManager.IMPORTANCE_DEFAULT);
@@ -1913,7 +1915,6 @@ public class FmService extends Service implements FmRecorder.OnRecorderStateChan
         }
 
         if (null == mNotificationBuilder) {
-            Log.d(TAG, "\n====== NOTIFICATION BUILDER =======\n");
             mNotificationBuilder = new Notification.Builder(mContext, CHANNEL_ID);
             mNotificationBuilder.setSmallIcon(R.mipmap.ic_launcher);
             mNotificationBuilder.setShowWhen(false);
